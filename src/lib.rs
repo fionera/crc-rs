@@ -1,3 +1,6 @@
+#![feature(bench_black_box)]
+#![feature(const_black_box)]
+
 //! # crc
 //! Rust implementation of CRC(8, 16, 32, 64)
 //!

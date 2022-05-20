@@ -1,5 +1,6 @@
-use super::{Algorithm, Crc, Digest};
 use crate::table::crc32_table;
+
+use super::{Algorithm, Crc, Digest};
 
 impl Crc<u32> {
     pub const fn new(algorithm: &'static Algorithm<u32>) -> Self {
@@ -27,19 +28,34 @@ impl Crc<u32> {
 
     const fn update(&self, mut crc: u32, bytes: &[u8]) -> u32 {
         let mut i = 0;
-        if self.algorithm.refin {
-            while i < bytes.len() {
-                let table_index = crc ^ bytes[i] as u32;
-                crc = self.table_entry(table_index) ^ (crc >> 8);
-                i += 1;
+        while i < bytes.len() {
+            let b: u32;
+
+            #[cfg(target_arch = "bpf")]
+            {
+                let v = core::hint::black_box(bytes[i] as i32);
+                if v < u8::MIN as i32 || v > u8::MAX as i32 {
+                    return 0;
+                }
+                b = v as u32;
             }
-        } else {
-            while i < bytes.len() {
-                let table_index = (crc >> 24) ^ bytes[i] as u32;
-                crc = self.table_entry(table_index) ^ (crc << 8);
-                i += 1;
+
+            #[cfg(not(target_arch = "bpf"))]
+            {
+                b = bytes[i] as u32;
             }
+
+            let table_index: u32;
+            if self.algorithm.refin {
+                table_index = (crc >> 24) ^ b as u32;
+            } else {
+                table_index = crc ^ b as u32;
+            }
+
+            crc = self.table_entry(table_index) ^ (crc << 8);
+            i += 1;
         }
+
         crc
     }
 
